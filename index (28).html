@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GymX — Gym Management App (Frontend)</title>
+  <meta name="description" content="Frontend-only Gym Management Dashboard built with HTML, CSS and Vanilla JS. LocalStorage persistence, charts, CRUD for members/plans/diets/workouts, attendance and animations." />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* ----------------- Theme / Base ----------------- */
+    :root{--bg:#f6f8fb;--card:#fff;--muted:#6b7280;--text:#0f172a;--primary:#2563eb;--success:#16a34a;--danger:#ef4444;--glass:rgba(255,255,255,0.6);}
+    .dark{--bg:#071025;--card:#071829;--muted:#9ca3af;--text:#e6eef8;--primary:#60a5fa;--success:#34d399;--danger:#fb7185;--glass:rgba(255,255,255,0.03)}
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;background:linear-gradient(180deg,var(--bg),#e8eefb);color:var(--text);-webkit-font-smoothing:antialiased}
+    a{color:inherit;text-decoration:none}
+    /* ----------------- Layout ----------------- */
+    .app{display:flex;min-height:100vh}
+    aside{width:260px;padding:20px;background:linear-gradient(180deg,#0ea5e9,#2563eb);color:#fff;display:flex;flex-direction:column;gap:18px}
+    .brand{font-weight:800;font-size:22px;letter-spacing:.6px}
+    nav{display:flex;flex-direction:column;gap:8px}
+    .nav-btn{background:rgba(255,255,255,0.08);border:0;color:#fff;padding:10px 12px;border-radius:10px;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all .18s}
+    .nav-btn:hover{transform:translateX(6px)}
+    .nav-btn.active{background:rgba(0,0,0,0.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+    main{flex:1;padding:20px;display:flex;flex-direction:column;gap:18px}
+    header.top{display:flex;justify-content:space-between;align-items:center}
+    header.top h1{margin:0;font-size:20px}
+    .top-actions{display:flex;gap:10px;align-items:center}
+    .btn{padding:8px 12px;border-radius:10px;border:0;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(15,23,42,.06)}
+    .btn.primary{background:var(--primary);color:white;box-shadow:0 10px 30px rgba(37,99,235,.08)}
+    /* ----------------- Cards & Grids ----------------- */
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .card{background:var(--card);padding:16px;border-radius:14px;box-shadow:0 8px 22px rgba(2,6,23,.06);transition:transform .18s,box-shadow .18s}
+    .card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(2,6,23,.08)}
+    .kpi-title{font-size:12px;color:var(--muted)}
+    .kpi-value{font-size:26px;font-weight:700}
+    .grid-2{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+
+    /* ----------------- Forms & Lists ----------------- */
+    form{display:grid;gap:10px}
+    input,select,textarea{padding:10px 12px;border-radius:10px;border:1px solid rgba(15,23,42,.06);background:transparent}
+    textarea{min-height:80px}
+    .list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+    .list li{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,.2));border:1px solid rgba(2,6,23,.04)}
+    .badge{padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid rgba(2,6,23,.04)}
+
+    /* ----------------- Small UI ----------------- */
+    .muted{color:var(--muted);font-size:13px}
+    .row{display:flex;gap:10px;align-items:center}
+    .actions{display:flex;gap:8px}
+
+    /* ----------------- Overlay Login ----------------- */
+    .overlay{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(0deg,rgba(2,6,23,.6),rgba(2,6,23,.6));z-index:60}
+    .overlay .card{max-width:420px;width:100%;text-align:center}
+
+    /* ----------------- Animations ----------------- */
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .animate{animation:fadeInUp .36s ease both}
+
+    /* ----------------- Responsive ----------------- */
+    @media(max-width:980px){aside{width:80px;padding:12px}.brand{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}.nav-btn{padding:8px;font-size:13px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside>
+      <div class="brand">GYM<span style="color:#fde68a">X</span></div>
+      <div class="muted">Manage members, plans, diets & attendance</div>
+      <nav>
+        <button class="nav-btn active" data-target="dashboard">Dashboard</button>
+        <button class="nav-btn" data-target="members">Members</button>
+        <button class="nav-btn" data-target="plans">Plans</button>
+        <button class="nav-btn" data-target="diets">Diets</button>
+        <button class="nav-btn" data-target="workouts">Workouts</button>
+        <button class="nav-btn" data-target="attendance">Attendance</button>
+        <button class="nav-btn" data-target="settings">Settings</button>
+      </nav>
+      <div style="margin-top:auto;font-size:12px;opacity:.9">v1.0 — Frontend Demo</div>
+    </aside>
+
+    <!-- Main -->
+    <main>
+      <header class="top animate">
+        <div>
+          <h1>GymX Dashboard</h1>
+          <div class="muted" id="today"></div>
+        </div>
+        <div class="top-actions">
+          <button class="btn ghost" id="export-all">Export CSV</button>
+          <button class="btn ghost" id="reset-data">Reset</button>
+          <label style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="theme-toggle">
+            <span class="muted">Dark</span>
+          </label>
+        </div>
+      </header>
+
+      <!-- Pages -->
+      <section id="dashboard" class="page animate">
+        <div class="kpi-grid">
+          <div class="card">
+            <div class="kpi-title">Total Members</div>
+            <div class="kpi-value" id="stat-members">0</div>
+          </div>
+          <div class="card">
+            <div class="kpi-title">Active Plans</div>
+            <div class="kpi-value" id="stat-plans">0</div>
+          </div>
+          <div class="card">
+            <div class="kpi-title">Classes Today</div>
+            <div class="kpi-value" id="stat-classes">0</div>
+          </div>
+          <div class="card">
+            <div class="kpi-title">Attendance Today</div>
+            <div class="kpi-value" id="stat-attendance">0</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mt">
+          <div class="card">
+            <h3>Member Growth</h3>
+            <canvas id="growthChart" height="120"></canvas>
+          </div>
+          <div class="card">
+            <h3>Plan Distribution</h3>
+            <canvas id="planChart" height="120"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section id="members" class="page" style="display:none">
+        <div class="card">
+          <h3>Add / Edit Member</h3>
+          <form id="member-form" class="grid-2">
+            <input type="hidden" id="member-id">
+            <input type="text" id="member-name" placeholder="Full Name" required>
+            <input type="email" id="member-email" placeholder="Email" required>
+            <input type="text" id="member-phone" placeholder="Phone">
+            <select id="member-plan"></select>
+            <select id="member-diet"></select>
+            <select id="member-workout"></select>
+            <button class="btn primary" type="submit">Save Member</button>
+            <button class="btn ghost" type="button" id="member-reset">Reset</button>
+          </form>
+        </div>
+
+        <div class="card mt">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <input id="member-search" placeholder="Search members..." style="width:60%" />
+            <div>
+              <button id="export-members" class="btn ghost">Export</button>
+            </div>
+          </div>
+          <ul id="members-list" class="list mt"></ul>
+        </div>
+      </section>
+
+      <section id="plans" class="page" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Create Membership Plan</h3>
+            <form id="plan-form" class="grid-2">
+              <input type="hidden" id="plan-id">
+              <input type="text" id="plan-name" placeholder="Plan name (Basic/Pro/Elite)" required>
+              <input type="number" id="plan-price" placeholder="Price (₹)" required>
+              <input type="number" id="plan-duration" placeholder="Duration (days)" required>
+              <input type="text" id="plan-features" placeholder="Features (comma-separated)" required>
+              <button class="btn primary" type="submit">Save Plan</button>
+              <button class="btn ghost" type="button" id="plan-reset">Reset</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Plans</h3>
+            <ul id="plans-list" class="list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="diets" class="page" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Create Diet Plan</h3>
+            <form id="diet-form" class="grid-2">
+              <input type="hidden" id="diet-id">
+              <input type="text" id="diet-name" placeholder="Diet name (e.g., Fat Loss)" required>
+              <input type="number" id="diet-calories" placeholder="Target Calories" required>
+              <textarea id="diet-breakfast" placeholder="Breakfast"></textarea>
+              <textarea id="diet-lunch" placeholder="Lunch"></textarea>
+              <textarea id="diet-dinner" placeholder="Dinner"></textarea>
+              <button class="btn primary" type="submit">Save Diet</button>
+              <button class="btn ghost" type="button" id="diet-reset">Reset</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Diet Plans</h3>
+            <ul id="diets-list" class="list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="workouts" class="page" style="display:none">
+        <div class="grid-2">
+          <div class="card">
+            <h3>Create Workout Plan</h3>
+            <form id="workout-form" class="grid-2">
+              <input type="hidden" id="workout-id">
+              <input type="text" id="workout-name" placeholder="Workout name (e.g., Push/Pull/Legs)" required>
+              <textarea id="workout-mon" placeholder="Monday exercises (one per line)"></textarea>
+              <textarea id="workout-tue" placeholder="Tuesday exercises"></textarea>
+              <textarea id="workout-wed" placeholder="Wednesday exercises"></textarea>
+              <textarea id="workout-thu" placeholder="Thursday exercises"></textarea>
+              <textarea id="workout-fri" placeholder="Friday exercises"></textarea>
+              <textarea id="workout-sat" placeholder="Saturday exercises"></textarea>
+              <textarea id="workout-sun" placeholder="Sunday exercises"></textarea>
+              <button class="btn primary" type="submit">Save Workout</button>
+              <button class="btn ghost" type="button" id="workout-reset">Reset</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Workout Plans</h3>
+            <ul id="workouts-list" class="list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="attendance" class="page" style="display:none">
+        <div class="card">
+          <h3>Mark Attendance</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="date" id="att-date">
+            <select id="att-member"></select>
+            <button id="att-mark" class="btn primary">Mark Present</button>
+          </div>
+        </div>
+        <div class="card mt">
+          <h3>Attendance (Selected Date)</h3>
+          <ul id="attendance-list" class="list"></ul>
+        </div>
+      </section>
+
+      <section id="settings" class="page" style="display:none">
+        <div class="card">
+          <h3>Profile & Preferences</h3>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div>
+              <label class="muted">Theme</label><br>
+              <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="theme-toggle-2"> Dark Mode</label>
+            </div>
+            <div>
+              <label class="muted">Danger Zone</label><br>
+              <button id="reset-app" class="btn" style="background:var(--danger);color:#fff">Reset All Data</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="login-overlay" class="overlay" style="display:none">
+    <div class="card">
+      <h2>Welcome back 👋</h2>
+      <p class="muted">Use <strong>admin@example.com</strong> / <strong>admin</strong> to sign in (demo)</p>
+      <form id="login-form" style="margin-top:12px;display:grid;gap:8px">
+        <input type="email" id="login-email" placeholder="Email" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
+          <button class="btn primary" type="submit">Login</button>
+          <button class="btn ghost" type="button" id="login-close">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /* -------------------- Storage Keys & Utils -------------------- */
+    const K = {TOKEN:'gx_token', MEMBERS:'gx_members', PLANS:'gx_plans', DIETS:'gx_diets', WORKOUTS:'gx_workouts', ATT:'gx_att', THEME:'gx_theme'};
+    const uid = ()=>Math.random().toString(36).slice(2,9);
+    const todayISO = ()=>new Date().toISOString().slice(0,10);
+    const get = (k,d=[])=> JSON.parse(localStorage.getItem(k)||JSON.stringify(d));
+    const set = (k,v)=> localStorage.setItem(k, JSON.stringify(v));
+
+    /* -------------------- Seed Demo Data -------------------- */
+    function seed(){
+      if(!localStorage.getItem(K.PLANS)) set(K.PLANS,[{id:'basic',name:'Basic',price:999,duration:30,features:['Gym Access']},{id:'pro',name:'Pro',price:1799,duration:30,features:['Classes','Trainer']},{id:'elite',name:'Elite',price:2999,duration:30,features:['All Access','Diet Program']}]);
+      if(!localStorage.getItem(K.DIETS)) set(K.DIETS,[{id:'fatloss',name:'Fat Loss',calories:1800,meals:{breakfast:'Oats + Eggs',lunch:'Chicken + Salad',dinner:'Veg + Roti'}},{id:'mass',name:'Muscle Gain',calories:2800,meals:{breakfast:'Paratha + Milk',lunch:'Rice + Chicken',dinner:'Paneer + Rice'}}]);
+      if(!localStorage.getItem(K.WORKOUTS)) set(K.WORKOUTS,[{id:'ppl',name:'Push/Pull/Legs',days:{mon:['Bench','OHP'],tue:['Deadlift','Rows'],wed:['Squat','Lunge']}}, {id:'fbw',name:'Full Body',days:{mon:['Squat','Bench','Row'],wed:['Deadlift','OHP','Pull-up'],fri:['Front Squat','Incline','Lat Pulldown']}}]);
+      if(!localStorage.getItem(K.MEMBERS)) set(K.MEMBERS, [{id:uid(),name:'Aarav Sharma',email:'aarav@example.com',phone:'9876543210',planId:'pro',dietId:'fatloss',workoutId:'ppl'},{id:uid(),name:'Ishita Verma',email:'ishita@example.com',phone:'9876501234',planId:'elite',dietId:'mass',workoutId:'fbw'}]);
+      if(!localStorage.getItem(K.ATT)) set(K.ATT, {});
+      if(!localStorage.getItem(K.THEME)) localStorage.setItem(K.THEME,'light');
+    }
+    seed();
+
+    /* -------------------- Simple Auth (Demo) -------------------- */
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginForm = document.getElementById('login-form');
+    const loginClose = document.getElementById('login-close');
+    function showLogin(){ loginOverlay.style.display='grid'; }
+    function hideLogin(){ loginOverlay.style.display='none'; }
+    loginForm.addEventListener('submit',(e)=>{e.preventDefault(); const email=document.getElementById('login-email').value; const pass=document.getElementById('login-password').value; if(email==='admin@example.com'&&pass==='admin'){ localStorage.setItem(K.TOKEN,'tok_'+uid()); hideLogin(); refreshAll(); } else alert('Invalid demo credentials — use admin@example.com / admin');});
+    loginClose.addEventListener('click', hideLogin);
+
+    /* -------------------- Theme -------------------- */
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeToggle2 = document.getElementById('theme-toggle-2');
+    function applyTheme(){ const t = localStorage.getItem(K.THEME)||'light'; document.documentElement.classList.toggle('dark', t==='dark'); themeToggle.checked = t==='dark'; if(themeToggle2) themeToggle2.checked = t==='dark'; }
+    applyTheme();
+    themeToggle.addEventListener('change', ()=>{ localStorage.setItem(K.THEME, themeToggle.checked?'dark':'light'); applyTheme(); });
+    themeToggle2?.addEventListener('change', ()=>{ localStorage.setItem(K.THEME, themeToggle2.checked?'dark':'light'); applyTheme(); });
+
+    /* -------------------- Navigation -------------------- */
+    const navBtns = document.querySelectorAll('aside nav .nav-btn');
+    const pages = document.querySelectorAll('main .page');
+    navBtns.forEach(b=>b.addEventListener('click', ()=>{ navBtns.forEach(x=>x.classList.remove('active')); b.classList.add('active'); pages.forEach(p=>p.style.display='none'); document.getElementById(b.dataset.target).style.display='block'; }));
+
+    /* -------------------- Members -------------------- */
+    const memberForm = document.getElementById('member-form');
+    const memberReset = document.getElementById('member-reset');
+    const membersList = document.getElementById('members-list');
+    const memberSearch = document.getElementById('member-search');
+    const memberPlan = document.getElementById('member-plan');
+    const memberDiet = document.getElementById('member-diet');
+    const memberWorkout = document.getElementById('member-workout');
+
+    function fillSelects(){
+      memberPlan.innerHTML = get(K.PLANS,[]).map(p=>`<option value="${p.id}">${p.name} (₹${p.price})</option>`).join('');
+      memberDiet.innerHTML = get(K.DIETS,[]).map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+      memberWorkout.innerHTML = get(K.WORKOUTS,[]).map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
+      attMember.innerHTML = get(K.MEMBERS,[]).map(m=>`<option value="${m.id}">${m.name}</option>`).join('');
+    }
+
+    function renderMembers(){
+      const q = memberSearch?.value?.toLowerCase()||'';
+      const arr = get(K.MEMBERS,[]).filter(m=>m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+      const plans = get(K.PLANS,[]); const diets = get(K.DIETS,[]); const works = get(K.WORKOUTS,[]);
+      membersList.innerHTML = arr.map(m=>{
+        const plan = plans.find(p=>p.id===m.planId)?.name||'-';
+        const diet = diets.find(d=>d.id===m.dietId)?.name||'-';
+        const workout = works.find(w=>w.id===m.workoutId)?.name||'-';
+        const attCount = totalAttendanceForMember(m.id);
+        return `<li>
+          <div class="row">
+            <strong>${m.name}</strong>
+            <span class="badge">${m.email}</span>
+            <span class="badge">📞 ${m.phone||'-'}</span>
+            <span class="badge">Plan: ${plan}</span>
+            <span class="badge">Diet: ${diet}</span>
+            <span class="badge">Workout: ${workout}</span>
+            <span class="badge">Att: ${attCount}</span>
+          </div>
+          <div class="actions">
+            <button class="btn ghost" onclick="editMember('${m.id}')">Edit</button>
+            <button class="btn" style="background:var(--danger);color:#fff" onclick="deleteMember('${m.id}')">Delete</button>
+          </div>
+        </li>`;
+      }).join('');
+      updateKPIs();
+    }
+
+    function editMember(id){ const m = get(K.MEMBERS,[]).find(x=>x.id===id); if(!m) return; document.getElementById('member-id').value=m.id; document.getElementById('member-name').value=m.name; document.getElementById('member-email').value=m.email; document.getElementById('member-phone').value=m.phone||''; memberPlan.value=m.planId||''; memberDiet.value=m.dietId||''; memberWorkout.value=m.workoutId||''; document.querySelector(`aside nav .nav-btn[data-target='members']`).click(); }
+    window.editMember = editMember;
+    function deleteMember(id){ if(!confirm('Delete member?')) return; set(K.MEMBERS, get(K.MEMBERS,[]).filter(x=>x.id!==id)); renderMembers(); refreshCharts(); fillSelects(); }
+    window.deleteMember = deleteMember;
+
+    memberForm.addEventListener('submit', (e)=>{ e.preventDefault(); const id=document.getElementById('member-id').value || uid(); const member={ id, name:document.getElementById('member-name').value.trim(), email:document.getElementById('member-email').value.trim(), phone:document.getElementById('member-phone').value.trim(), planId:memberPlan.value, dietId:memberDiet.value, workoutId:memberWorkout.value }; const arr=get(K.MEMBERS,[]); const idx=arr.findIndex(x=>x.id===id); if(idx>-1) arr[idx]=member; else arr.push(member); set(K.MEMBERS,arr); memberForm.reset(); document.getElementById('member-id').value=''; renderMembers(); refreshCharts(); fillSelects(); });
+    memberReset.addEventListener('click', ()=>{ memberForm.reset(); document.getElementById('member-id').value=''; });
+    memberSearch?.addEventListener('input', renderMembers);
+
+    document.getElementById('export-members')?.addEventListener('click', ()=>{ const members=get(K.MEMBERS,[]); const header=['Name','Email','Phone','Plan','Diet','Workout']; const plans=get(K.PLANS,[]); const diets=get(K.DIETS,[]); const works=get(K.WORKOUTS,[]); const rows=members.map(m=>[m.name,m.email,m.phone, plans.find(p=>p.id===m.planId)?.name||'', diets.find(d=>d.id===m.dietId)?.name||'', works.find(w=>w.id===m.workoutId)?.name||'']); const csv=[header,...rows].map(r=>r.map(x=>`"${(x||'').toString().replaceAll('"','""')}"`).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='members.csv'; a.click(); URL.revokeObjectURL(url); });
+
+    /* -------------------- Plans -------------------- */
+    const planForm = document.getElementById('plan-form'); const planReset=document.getElementById('plan-reset'); const plansList=document.getElementById('plans-list');
+    function renderPlans(){ const plans=get(K.PLANS,[]); plansList.innerHTML=plans.map(p=>`<li><div class='row'><strong>${p.name}</strong><span class='badge'>₹${p.price}</span><span class='badge'>${p.duration}d</span><span class='badge'>${p.features?.join(' • ')||''}</span></div><div class='actions'><button class='btn ghost' onclick="editPlan('${p.id}')">Edit</button><button class='btn' style='background:var(--danger);color:#fff' onclick="deletePlan('${p.id}')">Delete</button></div></li>`).join(''); fillSelects(); updateKPIs(); refreshCharts(); }
+    function editPlan(id){ const p=get(K.PLANS,[]).find(x=>x.id===id); if(!p) return; document.getElementById('plan-id').value=p.id; document.getElementById('plan-name').value=p.name; document.getElementById('plan-price').value=p.price; document.getElementById('plan-duration').value=p.duration; document.getElementById('plan-features').value=p.features?.join(', '); document.querySelector(`aside nav .nav-btn[data-target='plans']`).click(); }
+    window.editPlan=editPlan; function deletePlan(id){ if(!confirm('Delete plan?')) return; set(K.PLANS, get(K.PLANS,[]).filter(x=>x.id!==id)); renderPlans(); }
+    window.deletePlan=deletePlan;
+    planForm?.addEventListener('submit',(e)=>{ e.preventDefault(); const id=document.getElementById('plan-id').value||uid(); const plan={ id, name:document.getElementById('plan-name').value.trim(), price:+document.getElementById('plan-price').value, duration:+document.getElementById('plan-duration')?.value||30, features:document.getElementById('plan-features')?.value.split(',').map(s=>s.trim()).filter(Boolean) }; const arr=get(K.PLANS,[]); const idx=arr.findIndex(x=>x.id===id); if(idx>-1) arr[idx]=plan; else arr.push(plan); set(K.PLANS,arr); planForm.reset(); document.getElementById('plan-id').value=''; renderPlans(); });
+    planReset?.addEventListener('click',()=>{ planForm.reset(); document.getElementById('plan-id').value=''; });
+
+    /* -------------------- Diets -------------------- */
+    const dietForm=document.getElementById('diet-form'); const dietReset=document.getElementById('diet-reset'); const dietsList=document.getElementById('diets-list');
+    function renderDiets(){ const diets=get(K.DIETS,[]); dietsList.innerHTML=diets.map(d=>`<li><div class='row'><strong>${d.name}</strong><span class='badge'>${d.calories} kcal</span><span class='badge'>🍳 ${d.meals?.breakfast||''}</span><span class='badge'>🥗 ${d.meals?.lunch||''}</span></div><div class='actions'><button class='btn ghost' onclick="editDiet('${d.id}')">Edit</button><button class='btn' style='background:var(--danger);color:#fff' onclick="deleteDiet('${d.id}')">Delete</button></div></li>`).join(''); fillSelects(); }
+    function editDiet(id){ const d=get(K.DIETS,[]).find(x=>x.id===id); if(!d) return; document.getElementById('diet-id').value=d.id; document.getElementById('diet-name').value=d.name; document.getElementById('diet-calories').value=d.calories; document.getElementById('diet-breakfast').value=d.meals.breakfast; document.getElementById('diet-lunch').value=d.meals.lunch; document.getElementById('diet-dinner').value=d.meals.dinner; document.querySelector(`aside nav .nav-btn[data-target='diets']`).click(); }
+    window.editDiet=editDiet; function deleteDiet(id){ if(!confirm('Delete diet?')) return; set(K.DIETS,get(K.DIETS,[]).filter(x=>x.id!==id)); renderDiets(); }
+    window.deleteDiet=deleteDiet;
+    dietForm?.addEventListener('submit',(e)=>{ e.preventDefault(); const id=document.getElementById('diet-id').value||uid(); const diet={ id, name:document.getElementById('diet-name').value.trim(), calories:+document.getElementById('diet-calories').value, meals:{ breakfast:document.getElementById('diet-breakfast').value.trim(), lunch:document.getElementById('diet-lunch').value.trim(), dinner:document.getElementById('diet-dinner').value.trim() } }; const arr=get(K.DIETS,[]); const idx=arr.findIndex(x=>x.id===id); if(idx>-1) arr[idx]=diet; else arr.push(diet); set(K.DIETS,arr); dietForm.reset(); document.getElementById('diet-id').value=''; renderDiets(); });
+    dietReset?.addEventListener('click',()=>{ dietForm.reset(); document.getElementById('diet-id').value=''; });
+
+    /* -------------------- Workouts -------------------- */
+    const workoutForm=document.getElementById('workout-form'); const workoutReset=document.getElementById('workout-reset'); const workoutsList=document.getElementById('workouts-list');
+    function renderWorkouts(){ const arr=get(K.WORKOUTS,[]); workoutsList.innerHTML=arr.map(w=>`<li><div class='row'><strong>${w.name}</strong>${Object.entries(w.days||{}).map(([d,ex])=>`<span class='badge'>${d}: ${Array.isArray(ex)?ex.join(' | '):ex}</span>`).join('')}</div><div class='actions'><button class='btn ghost' onclick="editWorkout('${w.id}')">Edit</button><button class='btn' style='background:var(--danger);color:#fff' onclick="deleteWorkout('${w.id}')">Delete</button></div></li>`).join(''); fillSelects(); }
+    function editWorkout(id){ const w=get(K.WORKOUTS,[]).find(x=>x.id===id); if(!w) return; document.getElementById('workout-id').value=w.id; document.getElementById('workout-name').value=w.name; document.getElementById('workout-mon').value=(w.days.mon||[]).join('\n'); document.getElementById('workout-tue').value=(w.days.tue||[]).join('\n'); document.getElementById('workout-wed').value=(w.days.wed||[]).join('\n'); document.getElementById('workout-thu').value=(w.days.thu||[]).join('\n'); document.getElementById('workout-fri').value=(w.days.fri||[]).join('\n'); document.getElementById('workout-sat').value=(w.days.sat||[]).join('\n'); document.getElementById('workout-sun').value=(w.days.sun||[]).join('\n'); document.querySelector(`aside nav .nav-btn[data-target='workouts']`).click(); }
+    window.editWorkout=editWorkout; function deleteWorkout(id){ if(!confirm('Delete workout?')) return; set(K.WORKOUTS,get(K.WORKOUTS,[]).filter(x=>x.id!==id)); renderWorkouts(); }
+    window.deleteWorkout=deleteWorkout;
+    workoutForm?.addEventListener('submit',(e)=>{ e.preventDefault(); const id=document.getElementById('workout-id').value||uid(); const days={ mon:lines('workout-mon'), tue:lines('workout-tue'), wed:lines('workout-wed'), thu:lines('workout-thu'), fri:lines('workout-fri'), sat:lines('workout-sat'), sun:lines('workout-sun') }; const workout={ id, name:document.getElementById('workout-name').value.trim(), days }; const arr=get(K.WORKOUTS,[]); const idx=arr.findIndex(x=>x.id===id); if(idx>-1) arr[idx]=workout; else arr.push(workout); set(K.WORKOUTS,arr); workoutForm.reset(); document.getElementById('workout-id').value=''; renderWorkouts(); });
+    workoutReset?.addEventListener('click',()=>{ workoutForm.reset(); document.getElementById('workout-id').value=''; });
+    function lines(id){ return document.getElementById(id).value.split('\n').map(s=>s.trim()).filter(Boolean); }
+
+    /* -------------------- Attendance -------------------- */
+    const attDate = document.getElementById('att-date'); const attMember = document.getElementById('att-member'); const attMark = document.getElementById('att-mark'); const attList = document.getElementById('attendance-list');
+    attDate.value = todayISO();
+    function getAtt(date){ const map=get(K.ATT,{}); return new Set(map[date]||[]); }
+    function saveAtt(date,setIds){ const map=get(K.ATT,{}); map[date]=Array.from(setIds); set(K.ATT,map); }
+    function renderAttendance(){ const date=attDate.value; const ids=Array.from(getAtt(date)); const members=get(K.MEMBERS,[]); attList.innerHTML = ids.map(id=>{ const m=members.find(x=>x.id===id); return `<li><div class='row'><strong>${m?.name||id}</strong><span class='badge'>${m?.email||''}</span></div><div class='actions'><button class='btn' style='background:var(--danger);color:#fff' onclick="unmarkAttendance('${id}')">Remove</button></div></li>`; }).join(''); document.getElementById('stat-attendance').textContent = ids.length; }
+    function markAttendance(){ const date=attDate.value; const setIds=getAtt(date); setIds.add(attMember.value); saveAtt(date,setIds); renderAttendance(); }
+    function unmarkAttendance(id){ const date=attDate.value; const setIds=getAtt(date); setIds.delete(id); saveAtt(date,setIds); renderAttendance(); }
+    window.unmarkAttendance = unmarkAttendance; attMark.addEventListener('click', markAttendance); attDate.addEventListener('change', renderAttendance);
+    function totalAttendanceForMember(id){ const map=get(K.ATT,{}); return Object.values(map).reduce((acc,arr)=>acc + (arr.includes(id)?1:0),0); }
+
+    /* -------------------- Charts & KPIs -------------------- */
+    let growthChart, planChart;
+    function refreshCharts(){ const members=get(K.MEMBERS,[]); const plans=get(K.PLANS,[]); const dist=plans.map(p=>({label:p.name,count:members.filter(m=>m.planId===p.id).length})); const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const growth=Array.from({length:12},(_,i)=>Math.round((members.length/12)*(i+1)));
+      const ctx1=document.getElementById('growthChart'); const ctx2=document.getElementById('planChart'); growthChart?.destroy(); planChart?.destroy(); growthChart=new Chart(ctx1,{type:'line',data:{labels:months,datasets:[{label:'Members',data:growth,tension:.35,borderColor: getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#2563eb',fill:true,backgroundColor:'rgba(37,99,235,0.08)'}]},options:{responsive:true}}); planChart=new Chart(ctx2,{type:'doughnut',data:{labels:dist.map(d=>d.label),datasets:[{data:dist.map(d=>d.count)}]},options:{responsive:true}});
+    }
+    function updateKPIs(){ document.getElementById('stat-members').textContent = get(K.MEMBERS,[]).length; document.getElementById('stat-plans').textContent = get(K.PLANS,[]).length; document.getElementById('stat-classes').textContent = 3; document.getElementById('stat-attendance').textContent = (get(K.ATT,{})[todayISO()]||[]).length; }
+
+    /* -------------------- Extras -------------------- */
+    document.getElementById('reset-app').addEventListener('click', ()=>{ if(confirm('Reset all demo data?')){ localStorage.clear(); location.reload(); } });
+    document.getElementById('reset-data').addEventListener('click', ()=>{ if(confirm('Reset demo data?')){ localStorage.removeItem(K.MEMBERS); localStorage.removeItem(K.ATT); seed(); refreshAll(); } });
+    document.getElementById('export-all').addEventListener('click', ()=>{ // export members + attendance simple
+      const members=get(K.MEMBERS,[]); const att=get(K.ATT,{}); const json={members,attendance:att}; const blob=new Blob([JSON.stringify(json,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='gymx-export.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    /* -------------------- Boot / Refresh -------------------- */
+    const attMemberSelect = document.getElementById('att-member');
+    function fillSelectsSafe(){ try{ fillSelects(); }catch(e){}
+    }
+    function refreshAll(){ fillSelectsSafe(); renderMembers(); renderPlans(); renderDiets(); renderWorkouts(); renderAttendance(); refreshCharts(); updateKPIs(); document.getElementById('today').textContent = new Date().toDateString(); }
+    refreshAll();
+
+    // If not logged in, show login overlay (demo)
+    if(!localStorage.getItem(K.TOKEN)) showLogin(); else hideLogin();
+  </script>
+</body>
+</html>
